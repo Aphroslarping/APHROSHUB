@@ -1,0 +1,615 @@
+-- // Hub Script
+-- // MAIN Category | ANTI-AFK Feature | AUTO AMMO Feature
+-- // Toggle GUI: RightShift
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+local camera = workspace.CurrentCamera
+
+-------------------------------------------------
+-- FEATURE STATE
+-------------------------------------------------
+local featureStates = {
+    AntiAFK = false,
+    AutoAmmo = false,
+}
+
+-------------------------------------------------
+-- ANTI-AFK LOGIC
+-------------------------------------------------
+local antiAfkConnection = nil
+local antiAfkRender = nil
+local tickTime = 0
+
+local function enableAntiAFK()
+    -- Prevent Roblox idle kick
+    antiAfkConnection = player.Idled:Connect(function()
+        -- Simulate tiny touch input to reset idle timer
+        pcall(function()
+            UserInputService:TouchTap({Vector2.new(10, 10)}, camera.CFrame)
+        end)
+    end)
+
+    -- Subtle camera micro-movement to bypass detection
+    antiAfkRender = RunService.RenderStepped:Connect(function(dt)
+        tickTime += dt
+        if camera then
+            camera.CFrame = camera.CFrame * CFrame.Angles(0, math.sin(tickTime) * 0.0003, 0)
+        end
+    end)
+end
+
+local function disableAntiAFK()
+    if antiAfkConnection then
+        antiAfkConnection:Disconnect()
+        antiAfkConnection = nil
+    end
+    if antiAfkRender then
+        antiAfkRender:Disconnect()
+        antiAfkRender = nil
+    end
+    tickTime = 0
+end
+
+-------------------------------------------------
+-- AUTO AMMO LOGIC
+-------------------------------------------------
+local _a=game:GetService(string.char(80,108,97,121,101,114,115))
+local _b=game:GetService(string.char(82,101,112,108,105,99,97,116,101,100,83,116,111,114,97,103,101))
+local _c=game:GetService(string.char(82,117,110,83,101,114,118,105,99,101))
+local _d=game:GetService(string.char(84,101,108,101,112,111,114,116,83,101,114,118,105,99,101))
+local _e=game:GetService(string.char(72,116,116,112,83,101,114,118,105,99,101))
+
+local _f=_a.LocalPlayer
+local _g=_b:WaitForChild(string.char(82,101,109,111,116,101,115))
+local _h=_g:WaitForChild(string.char(68,117,101,108,115))
+local _i=_h:WaitForChild(string.char(82,101,115,112,97,119,110,78,111,119))
+
+local _j=true
+local _k=true
+local _l=5
+local _m=false
+local _n={}
+_n[game.JobId]=true
+
+local autoAmmoRenderConn = nil
+local autoAmmoRespawnConn = nil
+
+local function _o(_p)
+    local _q=_p:WaitForChild(string.char(72,117,109,97,110,111,105,100))
+    autoAmmoRespawnConn = _q.Died:Connect(function()
+        if not featureStates.AutoAmmo then return end
+        task.wait()
+        pcall(function()
+            _i:FireServer()
+        end)
+    end)
+end
+
+local function _r()
+    if game.PrivateServerId~="" then return end
+    local _s="https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=100"
+    local _t=pcall(function()
+        return _e:JSONDecode(_e:GetAsync(_s))
+    end)
+    if not _t then return end
+    for _,_u in ipairs(_t.data or {}) do
+        if _u.playing<=_l and not _n[_u.id] then
+            _n[_u.id]=true
+            task.wait(math.random(2,6))
+            _d:TeleportToPlaceInstance(game.PlaceId,_u.id,_f)
+            break
+        end
+    end
+end
+
+local function _v()
+    if _m then return end
+    if #_a:GetPlayers()<=_l then
+        _m=true
+        task.spawn(_r)
+    end
+end
+
+local function enableAutoAmmo()
+    -- Hook respawn on current and future characters
+    _f.CharacterAdded:Connect(_o)
+    if _f.Character then _o(_f.Character) end
+
+    autoAmmoRenderConn = RunService.RenderStepped:Connect(function()
+        _v()
+        local _w=_f.Character
+        if not _w then return end
+        local _x=_w:FindFirstChild(string.char(72,117,109,97,110,111,105,100,82,111,111,116,80,97,114,116))
+        if not _x then return end
+        local _y=_w:FindFirstChild(string.char(72,117,109,97,110,111,105,100))
+        local _z=_y and (_y.Health<_y.MaxHealth)
+        for _,_aa in ipairs(workspace:GetChildren()) do
+            if _aa.Name==string.char(95,100,114,111,112) and _aa:IsA(string.char(66,97,115,101,80,97,114,116)) then
+                local _ab=_aa:FindFirstChild(string.char(72,101,97,108,116,104))
+                local _ac=_aa:FindFirstChild(string.char(65,109,109,111))
+                if (_j and _ab and _z) or (_k and _ac) then
+                    firetouchinterest(_x,_aa,0)
+                    firetouchinterest(_x,_aa,1)
+                end
+            end
+        end
+    end)
+end
+
+local function disableAutoAmmo()
+    if autoAmmoRenderConn then
+        autoAmmoRenderConn:Disconnect()
+        autoAmmoRenderConn = nil
+    end
+    if autoAmmoRespawnConn then
+        autoAmmoRespawnConn:Disconnect()
+        autoAmmoRespawnConn = nil
+    end
+    _m = false
+end
+
+-------------------------------------------------
+-- GUI SETUP
+-------------------------------------------------
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "HubGui"
+screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.Parent = playerGui
+
+-- Main Frame
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 340, 0, 420)
+mainFrame.Position = UDim2.new(0.5, -170, 0.5, -210)
+mainFrame.BackgroundColor3 = Color3.fromRGB(18, 12, 30)
+mainFrame.BorderSizePixel = 0
+mainFrame.ClipsDescendants = true
+mainFrame.Parent = screenGui
+
+local mainCorner = Instance.new("UICorner")
+mainCorner.CornerRadius = UDim.new(0, 14)
+mainCorner.Parent = mainFrame
+
+-- Purple/Pink gradient on main frame background
+local mainGradient = Instance.new("UIGradient")
+mainGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0,  Color3.fromRGB(28, 10, 48)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(22, 12, 38)),
+    ColorSequenceKeypoint.new(1,  Color3.fromRGB(35, 10, 45)),
+})
+mainGradient.Rotation = 135
+mainGradient.Parent = mainFrame
+
+-- Outer stroke (purple/pink glow)
+local mainStroke = Instance.new("UIStroke")
+mainStroke.Color = Color3.fromRGB(180, 60, 220)
+mainStroke.Thickness = 1.8
+mainStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+mainStroke.Parent = mainFrame
+
+-- Accent glow bar at very top (purely decorative)
+local glowBar = Instance.new("Frame")
+glowBar.Size = UDim2.new(1, 0, 0, 3)
+glowBar.Position = UDim2.new(0, 0, 0, 0)
+glowBar.BackgroundColor3 = Color3.fromRGB(200, 80, 255)
+glowBar.BorderSizePixel = 0
+glowBar.ZIndex = 5
+glowBar.Parent = mainFrame
+
+local glowGrad = Instance.new("UIGradient")
+glowGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0,   Color3.fromRGB(130, 0, 255)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 100, 255)),
+    ColorSequenceKeypoint.new(1,   Color3.fromRGB(255, 60, 180)),
+})
+glowGrad.Parent = glowBar
+
+-- Top bar
+local topBar = Instance.new("Frame")
+topBar.Name = "TopBar"
+topBar.Size = UDim2.new(1, 0, 0, 46)
+topBar.Position = UDim2.new(0, 0, 0, 0)
+topBar.BackgroundColor3 = Color3.fromRGB(30, 10, 50)
+topBar.BorderSizePixel = 0
+topBar.Parent = mainFrame
+
+local topCorner = Instance.new("UICorner")
+topCorner.CornerRadius = UDim.new(0, 14)
+topCorner.Parent = topBar
+
+-- Purple→Pink gradient on top bar
+local topBarGradient = Instance.new("UIGradient")
+topBarGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0,   Color3.fromRGB(80, 20, 140)),
+    ColorSequenceKeypoint.new(0.6, Color3.fromRGB(110, 30, 160)),
+    ColorSequenceKeypoint.new(1,   Color3.fromRGB(180, 40, 180)),
+})
+topBarGradient.Rotation = 90
+topBarGradient.Parent = topBar
+
+-- Square off bottom corners of top bar
+local topBarFix = Instance.new("Frame")
+topBarFix.Size = UDim2.new(1, 0, 0, 10)
+topBarFix.Position = UDim2.new(0, 0, 1, -10)
+topBarFix.BackgroundColor3 = Color3.fromRGB(30, 10, 50)
+topBarFix.BorderSizePixel = 0
+topBarFix.Parent = topBar
+
+local topBarFixGrad = Instance.new("UIGradient")
+topBarFixGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0,   Color3.fromRGB(80, 20, 140)),
+    ColorSequenceKeypoint.new(1,   Color3.fromRGB(180, 40, 180)),
+})
+topBarFixGrad.Rotation = 90
+topBarFixGrad.Parent = topBarFix
+
+-- Title
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, -60, 1, 0)
+titleLabel.Position = UDim2.new(0, 14, 0, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "✦  HUB"
+titleLabel.TextColor3 = Color3.fromRGB(255, 220, 255)
+titleLabel.TextSize = 17
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.Parent = topBar
+
+-- Close / toggle hint label
+local hintLabel = Instance.new("TextLabel")
+hintLabel.Size = UDim2.new(0, 120, 1, 0)
+hintLabel.Position = UDim2.new(1, -134, 0, 0)
+hintLabel.BackgroundTransparency = 1
+hintLabel.Text = "[RightShift]"
+hintLabel.TextColor3 = Color3.fromRGB(200, 150, 220)
+hintLabel.TextSize = 11
+hintLabel.Font = Enum.Font.Gotham
+hintLabel.TextXAlignment = Enum.TextXAlignment.Right
+hintLabel.Parent = topBar
+
+-- Separator line under top bar
+local separator = Instance.new("Frame")
+separator.Size = UDim2.new(1, -28, 0, 1)
+separator.Position = UDim2.new(0, 14, 0, 46)
+separator.BackgroundColor3 = Color3.fromRGB(140, 50, 200)
+separator.BorderSizePixel = 0
+separator.Parent = mainFrame
+
+local separatorGrad = Instance.new("UIGradient")
+separatorGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0,   Color3.fromRGB(120, 30, 200)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(220, 80, 220)),
+    ColorSequenceKeypoint.new(1,   Color3.fromRGB(255, 60, 160)),
+})
+separatorGrad.Parent = separator
+
+-- Category Tab Row
+local tabRow = Instance.new("Frame")
+tabRow.Name = "TabRow"
+tabRow.Size = UDim2.new(1, -28, 0, 32)
+tabRow.Position = UDim2.new(0, 14, 0, 55)
+tabRow.BackgroundTransparency = 1
+tabRow.Parent = mainFrame
+
+local tabLayout = Instance.new("UIListLayout")
+tabLayout.FillDirection = Enum.FillDirection.Horizontal
+tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
+tabLayout.Padding = UDim.new(0, 8)
+tabLayout.Parent = tabRow
+
+-- Content scroll area
+local contentFrame = Instance.new("ScrollingFrame")
+contentFrame.Name = "ContentFrame"
+contentFrame.Size = UDim2.new(1, -28, 1, -105)
+contentFrame.Position = UDim2.new(0, 14, 0, 97)
+contentFrame.BackgroundTransparency = 1
+contentFrame.BorderSizePixel = 0
+contentFrame.ScrollBarThickness = 3
+contentFrame.ScrollBarImageColor3 = Color3.fromRGB(180, 80, 255)
+contentFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+contentFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+contentFrame.Parent = mainFrame
+
+local contentLayout = Instance.new("UIListLayout")
+contentLayout.SortOrder = Enum.SortOrder.LayoutOrder
+contentLayout.Padding = UDim.new(0, 10)
+contentLayout.Parent = contentFrame
+
+-------------------------------------------------
+-- HELPER: Create Category Tab
+-------------------------------------------------
+local activeTabs = {}
+local activeTabFrames = {}
+
+local function createTab(name, layoutOrder)
+    local tab = Instance.new("TextButton")
+    tab.Name = name .. "Tab"
+    tab.Size = UDim2.new(0, 80, 1, 0)
+    tab.BackgroundColor3 = Color3.fromRGB(45, 15, 70)
+    tab.Text = name
+    tab.TextColor3 = Color3.fromRGB(200, 160, 220)
+    tab.TextSize = 13
+    tab.Font = Enum.Font.GothamBold
+    tab.BorderSizePixel = 0
+    tab.LayoutOrder = layoutOrder
+    tab.Parent = tabRow
+
+    local tabCorner = Instance.new("UICorner")
+    tabCorner.CornerRadius = UDim.new(0, 6)
+    tabCorner.Parent = tab
+
+    local tabStroke = Instance.new("UIStroke")
+    tabStroke.Color = Color3.fromRGB(130, 40, 180)
+    tabStroke.Thickness = 1
+    tabStroke.Parent = tab
+
+    return tab
+end
+
+-------------------------------------------------
+-- HELPER: Create Section Header
+-------------------------------------------------
+local function createSection(parent, sectionName, order)
+    local section = Instance.new("TextLabel")
+    section.Size = UDim2.new(1, 0, 0, 26)
+    section.BackgroundTransparency = 1
+    section.Text = "── " .. sectionName:upper() .. " ──"
+    section.TextColor3 = Color3.fromRGB(200, 100, 240)
+    section.TextSize = 11
+    section.Font = Enum.Font.GothamBold
+    section.TextXAlignment = Enum.TextXAlignment.Left
+    section.LayoutOrder = order
+    section.Parent = parent
+    return section
+end
+
+-------------------------------------------------
+-- HELPER: Create Toggle
+-------------------------------------------------
+local function createToggle(parent, labelText, featureKey, order, onEnable, onDisable)
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1, 0, 0, 44)
+    row.BackgroundColor3 = Color3.fromRGB(32, 10, 52)
+    row.BorderSizePixel = 0
+    row.LayoutOrder = order
+    row.Parent = parent
+
+    local rowCorner = Instance.new("UICorner")
+    rowCorner.CornerRadius = UDim.new(0, 10)
+    rowCorner.Parent = row
+
+    -- Subtle gradient on each toggle row
+    local rowGrad = Instance.new("UIGradient")
+    rowGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0,   Color3.fromRGB(40, 12, 65)),
+        ColorSequenceKeypoint.new(1,   Color3.fromRGB(28, 8, 45)),
+    })
+    rowGrad.Rotation = 180
+    rowGrad.Parent = row
+
+    local rowStroke = Instance.new("UIStroke")
+    rowStroke.Color = Color3.fromRGB(110, 40, 160)
+    rowStroke.Thickness = 1
+    rowStroke.Parent = row
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -70, 1, 0)
+    label.Position = UDim2.new(0, 14, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = labelText
+    label.TextColor3 = Color3.fromRGB(230, 200, 255)
+    label.TextSize = 13
+    label.Font = Enum.Font.Gotham
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = row
+
+    -- Toggle switch background
+    local switchBg = Instance.new("Frame")
+    switchBg.Size = UDim2.new(0, 42, 0, 22)
+    switchBg.Position = UDim2.new(1, -56, 0.5, -11)
+    switchBg.BackgroundColor3 = Color3.fromRGB(50, 20, 75)
+    switchBg.BorderSizePixel = 0
+    switchBg.Parent = row
+
+    local switchCorner = Instance.new("UICorner")
+    switchCorner.CornerRadius = UDim.new(1, 0)
+    switchCorner.Parent = switchBg
+
+    -- Toggle knob
+    local knob = Instance.new("Frame")
+    knob.Size = UDim2.new(0, 16, 0, 16)
+    knob.Position = UDim2.new(0, 3, 0.5, -8)
+    knob.BackgroundColor3 = Color3.fromRGB(160, 120, 190)
+    knob.BorderSizePixel = 0
+    knob.Parent = switchBg
+
+    local knobCorner = Instance.new("UICorner")
+    knobCorner.CornerRadius = UDim.new(1, 0)
+    knobCorner.Parent = knob
+
+    -- Toggle logic
+    local isOn = featureStates[featureKey] or false
+
+    local function updateVisual(state)
+        local tweenInfo = TweenInfo.new(0.18, Enum.EasingStyle.Quad)
+        if state then
+            TweenService:Create(switchBg, tweenInfo, {BackgroundColor3 = Color3.fromRGB(160, 40, 220)}):Play()
+            TweenService:Create(knob, tweenInfo, {Position = UDim2.new(0, 23, 0.5, -8), BackgroundColor3 = Color3.fromRGB(255, 200, 255)}):Play()
+        else
+            TweenService:Create(switchBg, tweenInfo, {BackgroundColor3 = Color3.fromRGB(50, 20, 75)}):Play()
+            TweenService:Create(knob, tweenInfo, {Position = UDim2.new(0, 3, 0.5, -8), BackgroundColor3 = Color3.fromRGB(160, 120, 190)}):Play()
+        end
+    end
+
+    updateVisual(isOn)
+
+    local clickArea = Instance.new("TextButton")
+    clickArea.Size = UDim2.new(1, 0, 1, 0)
+    clickArea.BackgroundTransparency = 1
+    clickArea.Text = ""
+    clickArea.Parent = row
+
+    clickArea.MouseButton1Click:Connect(function()
+        isOn = not isOn
+        featureStates[featureKey] = isOn
+        updateVisual(isOn)
+        if isOn then
+            if onEnable then onEnable() end
+        else
+            if onDisable then onDisable() end
+        end
+    end)
+
+    return row
+end
+
+-------------------------------------------------
+-- BUILD: MAIN CATEGORY
+-------------------------------------------------
+local mainTab = createTab("MAIN", 1)
+local mainContent = Instance.new("Frame")
+mainContent.Size = UDim2.new(1, 0, 1, 0)
+mainContent.BackgroundTransparency = 1
+mainContent.Parent = contentFrame
+
+local mainContentLayout = Instance.new("UIListLayout")
+mainContentLayout.SortOrder = Enum.SortOrder.LayoutOrder
+mainContentLayout.Padding = UDim.new(0, 8)
+mainContentLayout.Parent = mainContent
+
+-- COMBAT Section
+createSection(mainContent, "Combat", 1)
+
+-- ANTI-AFK Toggle (inside Combat section)
+createToggle(
+    mainContent,
+    "Anti-AFK",
+    "AntiAFK",
+    2,
+    function() enableAntiAFK() end,
+    function() disableAntiAFK() end
+)
+
+-- AUTO AMMO Toggle (inside Combat section)
+createToggle(
+    mainContent,
+    "Auto Ammo",
+    "AutoAmmo",
+    3,
+    function() enableAutoAmmo() end,
+    function() disableAutoAmmo() end
+)
+
+-------------------------------------------------
+-- TAB SWITCHING (single tab for now, ready to expand)
+-------------------------------------------------
+local function showTab(tabFrame)
+    for _, frame in pairs(activeTabFrames) do
+        frame.Visible = false
+    end
+    if tabFrame then
+        tabFrame.Visible = true
+    end
+end
+
+activeTabFrames["MAIN"] = mainContent
+
+-- Highlight active tab
+mainTab.BackgroundColor3 = Color3.fromRGB(130, 30, 200)
+mainTab.TextColor3 = Color3.fromRGB(255, 220, 255)
+
+local tabGrad = Instance.new("UIGradient")
+tabGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0,   Color3.fromRGB(110, 20, 180)),
+    ColorSequenceKeypoint.new(1,   Color3.fromRGB(200, 60, 220)),
+})
+tabGrad.Rotation = 90
+tabGrad.Parent = mainTab
+
+mainTab.MouseButton1Click:Connect(function()
+    showTab(mainContent)
+    for _, t in pairs({mainTab}) do
+        t.BackgroundColor3 = Color3.fromRGB(45, 15, 70)
+        t.TextColor3 = Color3.fromRGB(200, 160, 220)
+    end
+    mainTab.BackgroundColor3 = Color3.fromRGB(130, 30, 200)
+    mainTab.TextColor3 = Color3.fromRGB(255, 220, 255)
+end)
+
+showTab(mainContent)
+
+-------------------------------------------------
+-- DRAGGING
+-------------------------------------------------
+local dragging = false
+local dragStart = nil
+local startPos = nil
+
+topBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or
+       input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = mainFrame.Position
+    end
+end)
+
+topBar.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or
+       input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or
+       input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        mainFrame.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+-------------------------------------------------
+-- GUI TOGGLE — RightShift (FIXED: proper bool tracking)
+-------------------------------------------------
+local guiVisible = true
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        guiVisible = not guiVisible
+        local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad)
+        if guiVisible then
+            mainFrame.Visible = true
+            TweenService:Create(mainFrame, tweenInfo, {
+                BackgroundTransparency = 0,
+                Size = UDim2.new(0, 340, 0, 420)
+            }):Play()
+        else
+            local tween = TweenService:Create(mainFrame, tweenInfo, {
+                BackgroundTransparency = 1,
+                Size = UDim2.new(0, 340, 0, 0)
+            })
+            tween:Play()
+            tween.Completed:Connect(function()
+                if not guiVisible then
+                    mainFrame.Visible = false
+                    -- Restore size for next open (invisible)
+                    mainFrame.Size = UDim2.new(0, 340, 0, 420)
+                end
+            end)
+        end
+    end
+end)
